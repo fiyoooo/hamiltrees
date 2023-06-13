@@ -1,0 +1,14 @@
+
+# ignore Python temporary and compiled files
+*.pyc
+.ipynb_checkpoints
+__pycache__
+
+# ignore compressed files
+*.zip
+*.tar.gz
+
+# Mac
+.DS_Store
+
+obsolete/
