@@ -2,64 +2,137 @@
     Hamiltonian construction acc. to eq. (9)
 """
 
-import qib
 from qib.operator import FieldOperator, FieldOperatorTerm, IFOType, IFODesc
-import fermitensor as ftn # after installing fermitensor (installed with kernel 3.10.11)
-
 import numpy as np
-from scipy import sparse
-from typing import Sequence
 
-# setzt alle coeff ausserhalb von range auf 0 um Dimension nicht zu veraendern
-def get_range(coeff, range):
-    ret = np.zeros_like(coeff)
-    if coeff.ndim == 2:
-        ret[range[0]:range[1], range[0]:range[1]] = coeff[range[0]:range[1], range[0]:range[1]]
-    elif coeff.ndim ==4:
-        ret[range[0]:range[1], range[0]:range[1], range[0]:range[1], range[0]:range[1]] = coeff[range[0]:range[1], range[0]:range[1], range[0]:range[1], range[0]:range[1]]
-    else:
-        raise NotImplementedError
-    return ret
-
-def get_part_of_H_as_field_operator(field, tkin, vint, L):
+def get_part_of_H_as_FO(field, tkin, vint, subsystem):
+    coeffs = np.copy(tkin)
+    # complementary indices
+    compl = [i for i in range(field.lattice.nsites) if i not in subsystem]
+    coeffs[compl, :] = 0
+    coeffs[:, compl] = 0
     # kinetic hopping term
     T = FieldOperatorTerm([IFODesc(field, IFOType.FERMI_CREATE),
                             IFODesc(field, IFOType.FERMI_ANNIHIL)],
-                            get_range(tkin, L))
+                            coeffs)
+    
+    coeffs = np.copy(vint)
+    # complementary indices
+    compl = [i for i in range(field.lattice.nsites) if i not in subsystem]
+    coeffs[compl, :, :, :] = 0
+    coeffs[:, compl, :, :] = 0
+    coeffs[:, :, compl, :] = 0
+    coeffs[:, :, :, compl] = 0
     # interaction term
     V = FieldOperatorTerm([IFODesc(field, IFOType.FERMI_CREATE),
                             IFODesc(field, IFOType.FERMI_CREATE),
                             IFODesc(field, IFOType.FERMI_ANNIHIL),
                             IFODesc(field, IFOType.FERMI_ANNIHIL)],
-                            0.5 * get_range(vint, L).transpose((0, 1, 3, 2)))
+                            0.5 * coeffs.transpose((0, 1, 3, 2)))
     return FieldOperator([T, V])
+
+def get_P_as_FO(field, vint, subsystem, i, j):
+    coeffs = np.copy(vint[i, j, :, :])
+    # complementary indices
+    compl = [i for i in range(field.lattice.nsites) if i not in subsystem]
+    coeffs[compl, :] = 0
+    coeffs[:, compl] = 0
+    V = FieldOperatorTerm([IFODesc(field, IFOType.FERMI_ANNIHIL),
+                            IFODesc(field, IFOType.FERMI_ANNIHIL)],
+                            coeffs.transpose((1, 0)))
+    return FieldOperator([V])
+    
+def get_Q_as_FO(field, vint, subsystem, i, j):
+    coeffs = vint[i, :, j, :] - vint[i, :, :, j]
+    # complementary indices
+    compl = [i for i in range(field.lattice.nsites) if i not in subsystem]
+    coeffs[compl, :] = 0
+    coeffs[:, compl] = 0
+    V = FieldOperatorTerm([IFODesc(field, IFOType.FERMI_CREATE),
+                            IFODesc(field, IFOType.FERMI_ANNIHIL)],
+                            coeffs)
+    return FieldOperator([V])
+
+def get_S_as_FO(field, tkin, vint, subsystem, i):
+    coeffs = np.copy(tkin[i, :])
+    # complementary indices
+    compl = [i for i in range(field.lattice.nsites) if i not in subsystem]
+    coeffs[compl] = 0
+    # kinetic hopping term
+    T = FieldOperatorTerm([IFODesc(field, IFOType.FERMI_ANNIHIL)],
+                            coeffs)
+    
+    coeffs = np.copy(vint[i, :, :, :])
+    # complementary indices
+    compl = [i for i in range(field.lattice.nsites) if i not in subsystem]
+    coeffs[compl, :, :] = 0
+    coeffs[:, compl, :] = 0
+    coeffs[:, :, compl] = 0
+    # interaction term
+    V = FieldOperatorTerm([IFODesc(field, IFOType.FERMI_CREATE),
+                            IFODesc(field, IFOType.FERMI_ANNIHIL),
+                            IFODesc(field, IFOType.FERMI_ANNIHIL)],
+                            coeffs.transpose((0, 2, 1)))
+    return FieldOperator([T, V])
+
+def single_term_FO(field, otype, i):
+    # single term Field Operator acting on only site i
+    coeffs = np.zeros(field.lattice.nsites)
+    coeffs[i] = 1
+    return FieldOperator([FieldOperatorTerm([IFODesc(field, otype)], coeffs)])
 
 def adjoint(P: FieldOperator):
     # get adjoint of Field Operator
     ret = []
 
     for term in P.terms:
-        opdesc = term.opdesc[::-1] # reverse order
-        for desc in opdesc: # replace create with annihil and vice versa
-            desc.otype = IFOType.adjoint(desc.otype)
-        coeffs = term.coeffs.conjugate().transpose() # reverse order
+        opdesc = []
+        for desc in term.opdesc[::-1]: # reverse order
+            opdesc += [IFODesc(desc.field, IFOType.adjoint(desc.otype))] # replace create with annihil and vice versa
+        coeffs = np.copy(term.coeffs).conjugate().T # reverse order
         
         ret.append(FieldOperatorTerm(opdesc, coeffs)) # create adjoint term
 
     return FieldOperator(ret)
 
-if __name__ == '__main__':
-    L = 8
-    L_1 = L//2
-    A = [0, L_1]
-    B = [L_1, L]
+def get_H_AB_as_FO(field, tkin, vint, A, B):
+    # acc. to equ. (10) in paper
+    
+    S_i = sum((single_term_FO(field, IFOType.FERMI_CREATE, i) 
+               @ get_S_as_FO(field, tkin, vint, B, i) 
+               for i in A), 
+               FieldOperator([]))
+    Q_ii = sum((single_term_FO(field, IFOType.FERMI_CREATE, i) 
+                @ single_term_FO(field, IFOType.FERMI_ANNIHIL, i) 
+                @ get_Q_as_FO(field, vint, B, i, i) 
+                for i in A), 
+                FieldOperator([]))
+    S_j = sum((single_term_FO(field, IFOType.FERMI_CREATE, j) 
+               @ get_S_as_FO(field, tkin, vint, A, j) 
+               for j in B), 
+               FieldOperator([]))
+    
+    # i > j in A
+    P_ij = FieldOperator([])
+    Q_ij = FieldOperator([])
+    for i in A:
+        for j in range(i):
+            P_ij += single_term_FO(field, IFOType.FERMI_ANNIHIL, i) @ single_term_FO(field, IFOType.FERMI_ANNIHIL, j) @ adjoint(get_P_as_FO(field, vint, B, i, j))
+            Q_ij += single_term_FO(field, IFOType.FERMI_CREATE, i) @ single_term_FO(field, IFOType.FERMI_ANNIHIL, j) @ get_Q_as_FO(field, vint, B, i, j)
 
-    latt = qib.lattice.FullyConnectedLattice((L,))
-    field = qib.field.Field(qib.field.ParticleType.FERMION, latt)
+    
+    # P_ij = sum(((sum(single_term_FO(field, IFOType.FERMI_ANNIHIL, i) 
+    #              @ single_term_FO(field, IFOType.FERMI_ANNIHIL, j) 
+    #              @ adjoint(get_P_as_FO(field, vint, B, i, j)) 
+    #              for j in range(i)), FieldOperator([])) for i in A), 
+    #              FieldOperator([]))
+    
+    # Q_ij = sum(((single_term_FO(field, IFOType.FERMI_CREATE, i) 
+    #              @ single_term_FO(field, IFOType.FERMI_ANNIHIL, j) 
+    #              @ get_Q_as_FO(field, vint, B, i, j) 
+    #              for j in range(i)) for i in A), 
+    #              FieldOperator([]))
 
-    # create MolecularHamiltonian Object
-    H = construct_random_molecular_hamiltonian(L)
-
-    # Create easy parts on left and right H_A and H_B.
-    H_A = get_part_of_H_as_field_operator(H.field, H.tkin, H.vint, A)
-    H_B = get_part_of_H_as_field_operator(H.field, H.tkin, H.vint, B)
+    firstLine = S_i + S_j + Q_ii
+    secLine = P_ij + Q_ij
+    return firstLine + secLine + adjoint(firstLine) + adjoint(secLine)
