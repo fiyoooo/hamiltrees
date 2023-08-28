@@ -3,12 +3,24 @@
 """
 
 import qib
-import fermitensor as ftn # after installing fermitensor (installed with kernel 3.10.11)
+# import fermitensor as ftn # after installing fermitensor (installed with kernel 3.10.11)
 
 import numpy as np
 
+def construct_random_coefficients(L, rng):
+    # Hamiltonian coefficients
+    tkin = 0.5 * qib.util.crandn((L, L), rng)
+    vint = 0.5 * qib.util.crandn((L, L, L, L), rng)
+    # make hermitian
+    tkin = 0.5 * (tkin + tkin.conj().T)
+    vint = 0.5 * (vint + vint.conj().transpose((2, 3, 0, 1)))
+    # add varchange symmetry
+    vint = 0.5 * (vint + vint.transpose(1, 0, 3, 2))
+    
+    return (tkin, vint)
+
 # copied test_molecular_hamiltonian_construction from qib.tests.test_molecular_hamiltonian
-def construct_random_molecular_hamiltonian(L):
+def construct_random_molecular_hamiltonian(L, rng):
     """
     Construct a random molecular Hamiltonian in second quantization formulation,
     using physicists' convention for the interaction term (note ordering of k and \ell) (dimensions (2^k,2^k)):
@@ -19,20 +31,20 @@ def construct_random_molecular_hamiltonian(L):
             + \\frac{1}{2} \sum_{i,j,k,\ell} v_{i,j,k,\ell} 
             a^{\dagger}_i a^{\dagger}_j a_{\ell} a_k
     """
-    rng = np.random.default_rng()
     # underlying lattice
     latt = qib.lattice.FullyConnectedLattice((L,))
     field = qib.field.Field(qib.field.ParticleType.FERMION, latt)
 
     # Hamiltonian coefficients
-    c = 0 # qib.util.crandn(rng=rng)
     tkin = 0.5 * qib.util.crandn((L, L), rng)
     vint = 0.5 * qib.util.crandn((L, L, L, L), rng)
     # make hermitian
     tkin = 0.5 * (tkin + tkin.conj().T)
     vint = 0.5 * (vint + vint.conj().transpose((2, 3, 0, 1)))
+    # add varchange symmetry
+    vint = 0.5 * (vint + vint.transpose(1, 0, 3, 2))
     
-    H = qib.operator.MolecularHamiltonian(field, c, tkin, vint, qib.operator.MolecularHamiltonianSymmetry(0))
+    H = qib.operator.MolecularHamiltonian(field, 0., tkin, vint, qib.operator.MolecularHamiltonianSymmetry.HERMITIAN | qib.operator.MolecularHamiltonianSymmetry.VARCHANGE)
     return H
 
 # copied test_as_vector from fermionic_tensor_networks.code.tests.test_fMPS

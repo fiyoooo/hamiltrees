@@ -6,4 +6,7 @@ Fermionic Hamiltonian Construction for Tree Tensor Network Architectures.
 
 """
 
-# from .bond_ops     import *
+from hamiltrees import (
+    block_partitioning,
+    matrix_reference
+)
