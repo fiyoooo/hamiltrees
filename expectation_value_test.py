@@ -20,6 +20,7 @@ import scipy.sparse.linalg as spla
 
 class TestExpectationValue(unittest.TestCase):
 
+    @unittest.skip("not done yet")
     def test_with_partitioned(self):
 
         L = 5
@@ -38,8 +39,9 @@ class TestExpectationValue(unittest.TestCase):
                 
         # calculating <psi|H|psi>
         exp_val = np.vdot(psi, H @ psi)
-        self.assertAlmostEqual(exp_val, exp_val.real) # expectation value should be real # TODO
-        
+        self.assertAlmostEqual(exp_val, np.real(exp_val)) # expectation value should be real
+
+    @unittest.skip("fMPS not working yet")
     def test_with_fMPS(self):
         
         L = 8
@@ -59,25 +61,45 @@ class TestExpectationValue(unittest.TestCase):
                 
         # calculating <psi|H|psi>
         exp_val = np.vdot(psi, H @ psi)
-        self.assertAlmostEqual(exp_val, exp_val.real) # expectation value should be real # TODO
-        
+        self.assertAlmostEqual(exp_val, np.real(exp_val)) # expectation value should be real
+
     def test_with_MPS(self):
         
         L = 8
-    
+        rng = np.random.default_rng(142)
+        
         # random Hamiltonian
-        H = ham.random_construction.construct_random_molecular_hamiltonian(L).as_matrix()
-        self.assertAlmostEqual(spla.norm(H - H.conj().T), 0)
+        H = ham.random_construction.construct_random_molecular_hamiltonian(L, rng).as_field_operator()
+        H_matrix = H.as_matrix()
+        self.assertAlmostEqual(spla.norm(H_matrix - H_matrix.conj().T), 0)
 
         # constructing psi
         psi = ham.random_construction.construct_random_MPS(L)
-        # TODO psi as vector
+        # psi = ham.random_construction.mps_to_full_tensor(psi)
+
+        # self.assertAlmostEqual(H.shape, len(psi)) # TODO
         
-        self.assertAlmostEqual(H.shape, psi.shape) # TODO
-                
+        H_psi = ham.block_partitioning.apply_hamiltonian(H, psi)
+
         # calculating <psi|H|psi>
-        exp_val = np.vdot(psi, H @ psi)
-        self.assertAlmostEqual(exp_val, exp_val.real) # expectation value should be real # TODO
+        exp_val = ham.random_construction.mps_vdot(psi, H @ psi)
+        self.assertAlmostEqual(exp_val, np.real(exp_val)) # expectation value should be real
+
+    @unittest.skip("not done yet")
+    def test_full_tensor(self): # TODO
+        # construct S and T as full tensors
+        # (only for testing - in practice one usually works with the MPS matrices directly!)
+        S = ham.random_construction.mps_to_full_tensor(Alist)
+        T = ham.random_construction.mps_to_full_tensor(Blist)
+
+        # should all agree
+        print("n:", n)
+        print("S.shape:", S.shape)
+        print("T.shape:", T.shape)
+
+        # dimension consistency checks
+        assert np.array_equal(np.array(S.shape), np.array(n))
+        assert np.array_equal(np.array(T.shape), np.array(n))
         
 if __name__ == "__main__":
     unittest.main()

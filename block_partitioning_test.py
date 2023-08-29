@@ -27,7 +27,7 @@ class TestBlockPartitioning(unittest.TestCase):
         rng = np.random.default_rng(142)
         
         # random Hamiltonian
-        H = ham.matrix_reference.construct_random_molecular_hamiltonian(L, rng)
+        H = ham.random_construction.construct_random_molecular_hamiltonian(L, rng)
         field = H.field
         tkin = H.tkin
         vint = H.vint
