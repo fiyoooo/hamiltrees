@@ -2,8 +2,8 @@
     Hamiltonian construction acc. to Eq. (9)
 """
 
-import qib
 import numpy as np
+import qib
 
 
 def construct_part_of_hamiltonian(sites, field: qib.field.Field, tkin, vint):

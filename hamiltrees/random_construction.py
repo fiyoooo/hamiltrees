@@ -1,11 +1,12 @@
 """
-    Referenzwert mit Matrizen
+    Construction of random Hamiltonians and tensors.
 """
+
+import block_partitioning as bp
+import numpy as np
 
 import qib
 # import fermitensor as ftn # after installing fermitensor (installed with kernel 3.10.11)
-
-import numpy as np
 
 def construct_random_coefficients(L, rng):
     # Hamiltonian coefficients
@@ -19,7 +20,6 @@ def construct_random_coefficients(L, rng):
     
     return (tkin, vint)
 
-# copied test_molecular_hamiltonian_construction from qib.tests.test_molecular_hamiltonian
 def construct_random_molecular_hamiltonian(L, rng):
     """
     Construct a random molecular Hamiltonian in second quantization formulation,
@@ -35,18 +35,40 @@ def construct_random_molecular_hamiltonian(L, rng):
     latt = qib.lattice.FullyConnectedLattice((L,))
     field = qib.field.Field(qib.field.ParticleType.FERMION, latt)
 
-    # Hamiltonian coefficients
-    tkin = 0.5 * qib.util.crandn((L, L), rng)
-    vint = 0.5 * qib.util.crandn((L, L, L, L), rng)
-    # make hermitian
-    tkin = 0.5 * (tkin + tkin.conj().T)
-    vint = 0.5 * (vint + vint.conj().transpose((2, 3, 0, 1)))
-    # add varchange symmetry
-    vint = 0.5 * (vint + vint.transpose(1, 0, 3, 2))
-    
+    # random coefficients
+    tkin, vint = construct_random_coefficients(L, rng)
+
     H = qib.operator.MolecularHamiltonian(field, 0., tkin, vint, qib.operator.MolecularHamiltonianSymmetry.HERMITIAN | qib.operator.MolecularHamiltonianSymmetry.VARCHANGE)
     return H
 
+def construct_random_partitioned_hamiltonian(L, LA, rng):
+    """
+    Construct a random partitioned molecular Hamiltonian acc. to the paper.
+    Returns a FieldOperator.
+    """
+    # underlying lattice
+    latt = qib.lattice.FullyConnectedLattice((L,))
+    field = qib.field.Field(qib.field.ParticleType.FERMION, latt)
+
+    # random coefficients
+    tkin, vint = construct_random_coefficients(L, rng)
+
+    # sizes of regions A and B
+    regionA = range(0, LA)
+    regionB = range(LA, L)
+
+    # H_A Hamiltonian
+    HA = bp.construct_part_of_hamiltonian(regionA, field, tkin, vint)
+    
+    # H_B Hamiltonian
+    HB = bp.construct_part_of_hamiltonian(regionB, field, tkin, vint)
+    
+    # H_{AB} Hamiltonian
+    HAB = bp.construct_interacting_hamiltonian(regionA, regionB, field, tkin, vint)
+
+    return HA + HAB + HB
+    
+    
 # copied test_as_vector from fermionic_tensor_networks.code.tests.test_fMPS
 def construct_random_fMPS(L):
     rng = np.random.default_rng()
@@ -71,31 +93,10 @@ def construct_random_fMPS(L):
     print(d**L)
     return ftn.fMPS(A)
 
-"""
-    Berechne Erwartungswert <psi|H|psi> mit Matrizen als Referenzwert für spätere Tests.
-"""
-if __name__ == '__main__':
-    L = 8 # ist k in paper
-    
-    # constructing H in (8)
-    H = construct_random_molecular_hamiltonian(L).as_matrix()
-    print(H-H.conj().T)
-
-    # constructing psi
-    # Randomly create an fMPS tensors with the `fMPSTensor` class and `crandn()`. 
-    # Use it as fMPS with `as_vector()` to get the statevector.
-    parity = ["even", "odd"][0] # change for odd parity
-
-    psi = construct_random_fMPS(L)
-    psi_even = psi.as_vector("even")
-    psi_odd = psi.as_vector("odd")
-    psi = np.concatenate((psi_even, psi_odd))
-    psi /= np.linalg.norm(psi)
-
-    print(psi.shape)
-
-    # calculating <psi|H|psi>
-    print(H.shape)
-    print(psi.shape)
-    exp_val = np.vdot(psi, H @ psi)
-    print(exp_val) # sollte reell sein
+def contruct_random_MPS(L):
+    """
+    Construct a random MPS as list of L matrices.
+    The i-th MPS tensor Alist[i] is expected to have dimensions (n[i], Da[i], Da[i+1])
+    """
+    # TODO
+    return None

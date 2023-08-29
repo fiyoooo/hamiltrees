@@ -23,10 +23,10 @@ class TestBlockPartitioning(unittest.TestCase):
 
     def test(self):
 
-        rng = np.random.default_rng(142)
-
-        # random Hamiltonian
         L = 5
+        rng = np.random.default_rng(142)
+        
+        # random Hamiltonian
         H = ham.matrix_reference.construct_random_molecular_hamiltonian(L, rng)
         field = H.field
         tkin = H.tkin
