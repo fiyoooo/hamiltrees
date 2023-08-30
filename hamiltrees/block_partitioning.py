@@ -1,5 +1,5 @@
 """
-    Hamiltonian construction acc. to Eq. (9)
+    Hamiltonian construction acc. to Eq. (9).
 """
 
 import numpy as np
@@ -120,23 +120,3 @@ def construct_interacting_hamiltonian(regionA, regionB, field, tkin, vint):
     HABhalf = (S_i + S_j + P_ij + Q_ij)
     
     return HABhalf + HABhalf.adjoint() # TODO make return Molecularhamiltonian?
-
-def apply_operator(op, psi, i: int):
-    None
-
-def apply_hamiltonian(H: qib.operator.FieldOperator, psi):
-    """
-    Apply the hamiltonian H as FieldOperator to the MPS psi as list of tensors
-    """
-    # TODO
-
-    # iterate through all sites
-    for term in H.terms:
-        print(len(term.opdesc))
-        print(term.opdesc)
-        print("\n coeffs starting")
-        print(term.coeffs.shape)
-    # apply the respective operator
-    # apply_operator(op, psi, i)
-
-    return psi
