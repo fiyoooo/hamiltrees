@@ -64,6 +64,7 @@ class TestExpectationValue(unittest.TestCase):
     def test_with_MPS(self):
         
         L = 5
+        LA = 2
         rng = np.random.default_rng(142)
         
         # random Hamiltonian
@@ -73,15 +74,35 @@ class TestExpectationValue(unittest.TestCase):
 
         # constructing psi
         psi = ham.random_construction.construct_random_MPS(L)
-        # psi = ham.random_construction.mps_to_full_tensor(psi)
-
+        
         # self.assertAlmostEqual(H.shape, len(psi)) # TODO
         
-        H_psi = ham.expectation_value.apply_hamiltonian(H, psi)
-
-        # calculating <psi|H|psi>
-        exp_val = ham.random_construction.mps_vdot(psi, H_psi)
+        exp_val = ham.expectation_value.expectation_value(H, LA, psi)
         self.assertAlmostEqual(exp_val, np.real(exp_val)) # expectation value should be real
+
+    def test_create_op(self):
+        
+        L = 5
+        
+        # constructing psi
+        psi = ham.random_construction.construct_random_MPS(L)
+        
+        psi_op = ham.expectation_value.apply_create_op(0, psi, 2)
+
+        # TODO test if tensor at 0 also correct
+        self.assertAlmostEqual(psi[1:], psi_op[1:]) # other tensors should stay the same
+
+    def test_annihil_op(self):
+        
+        L = 5
+        
+        # constructing psi
+        psi = ham.random_construction.construct_random_MPS(L)
+        
+        psi_op = ham.expectation_value.apply_annihil_op(0, psi, 2)
+
+        # TODO test if tensor at 0 also correct
+        self.assertAlmostEqual(psi[1:], psi_op[1:]) # other tensors should stay the same
 
     @unittest.skip("not done yet")
     def test_full_tensor(self): # TODO
