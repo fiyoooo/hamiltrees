@@ -2,162 +2,198 @@
     Calculation of expectation value with partitioned Hamiltonian.
 """
 
+from typing import Sequence
 import numpy as np
 import qib
 
 
-def apply_part_of_hamiltonian(H: qib.operator.MolecularHamiltonian, sites, psi):
+def apply_part_of_hamiltonian(H: qib.operator.MolecularHamiltonian, sites, psi: Sequence[any]):
     """
-    Construct the hamiltonian on the given sites.
+    Apply the hamiltonian on the given sites to an MPS.
     """
-    # complementary indices
-    compl = [i for i in range(H.field.lattice.nsites) if i not in sites]
+    print("\nStart applying part of Hamiltonian at sites ", sites)
     
+    result = [np.zeros_like(M) for M in psi]
+
     # kinetic hopping term
-    tkinCopy = np.copy(H.tkin)
-    tkinCopy[compl, :] = 0
-    tkinCopy[:, compl] = 0
+    for i in sites:
+        for j in sites:
+            result += apply_create_op(i, 
+                      apply_annihil_op(j, psi, H.tkin[i, j])) # TODO wie addieren
     
+    # TODO schöner loopen
     # interaction term
-    vintCopy = np.copy(H.vint)
-    vintCopy[compl, :, :, :] = 0
-    vintCopy[:, compl, :, :] = 0
-    vintCopy[:, :, compl, :] = 0
-    vintCopy[:, :, :, compl] = 0
+    for i in sites:
+        for j in sites:
+            for k in sites:
+                for l in sites:
+                    print("Round: ", i,j,k,l)
+                    result += apply_create_op(i, 
+                              apply_create_op(j, 
+                              apply_annihil_op(k, 
+                              apply_annihil_op(l, psi, 0.5 * H.vint[i, j, l, k])))) # TODO wie addieren
     
-    # TODO apply to psi
-    qib.operator.MolecularHamiltonian(H.field, 0., tkinCopy, vintCopy, qib.operator.MolecularHamiltonianSymmetry.HERMITIAN)
+    return result
 
-    return psi
-
-def construct_complementary_p(i: int, j: int, sites, field: qib.field.Field, vint):
+def apply_complementary_p(i: int, j: int, sites, field: qib.field.Field, vint, psi: Sequence[any]):
     """
     Construct the complementary operator `P_{ij}^B` in Eq. (11).
     """
     L = field.lattice.nsites
     vint = np.asarray(vint)
     assert vint.shape == (L, L, L, L)
-    # indicator function
-    eb = np.zeros(L)
+    
+    result = [np.zeros_like(M) for M in psi]
     for k in sites:
-        eb[k] = 1
-    return qib.operator.FieldOperator([
-        qib.operator.FieldOperatorTerm(
-            [qib.operator.IFODesc(field, qib.operator.IFOType.FERMI_ANNIHIL),
-             qib.operator.IFODesc(field, qib.operator.IFOType.FERMI_ANNIHIL)],
-            [[0.5*vint[i, j, l, k]*eb[l]*eb[k] for l in range(L)] for k in range(L)])])
+        for l in sites:
+            sint += apply_annihil_op(k, 
+                    apply_annihil_op(l, psi, 0.5*vint[i, j, l, k]))
 
-def construct_complementary_q(i: int, j: int, sites, field: qib.field.Field, vint):
+    return result
+
+def apply_complementary_q(i: int, j: int, sites, field: qib.field.Field, vint, psi: Sequence[any]):
     """
     Construct the complementary operator `Q_{ij}^B` in Eq. (12).
     """
     L = field.lattice.nsites
     vint = np.asarray(vint)
     assert vint.shape == (L, L, L, L)
-    # indicator function
-    eb = np.zeros(L)
+    
+    result = [np.zeros_like(M) for M in psi]
     for k in sites:
-        eb[k] = 1
-    return qib.operator.FieldOperator([
-        qib.operator.FieldOperatorTerm(
-            [qib.operator.IFODesc(field, qib.operator.IFOType.FERMI_CREATE),
-             qib.operator.IFODesc(field, qib.operator.IFOType.FERMI_ANNIHIL)],
-            [[0.5*((vint[i, k, j, l] + vint[k, i, l, j])/2 - vint[i, k, l, j])*eb[l]*eb[k] for l in range(L)] for k in range(L)])])
+        for l in sites:
+            sint += apply_create_op(k, 
+                    apply_annihil_op(l, psi, 0.5*((vint[i, k, j, l] + vint[k, i, l, j])/2 - vint[i, k, l, j])))
 
-def construct_complementary_s(i: int, sites, field: qib.field.Field, tkin, vint):
+    return result
+
+def apply_complementary_s(i: int, sites, field: qib.field.Field, tkin, vint, psi: Sequence[any]):
     """
-    Construct the complementary operator `S_i^B` in Eq. (13).
+    Apply the complementary operator `S_i^B` in Eq. (13) to an MPS.
     """
     L = field.lattice.nsites
     tkin = np.asarray(tkin)
     vint = np.asarray(vint)
     assert tkin.shape == (L, L)
     assert vint.shape == (L, L, L, L)
-    # indicator function
-    eb = np.zeros(L)
-    for k in sites:
-        eb[k] = 1
-    skin = qib.operator.FieldOperatorTerm([qib.operator.IFODesc(field, qib.operator.IFOType.FERMI_ANNIHIL)], [0.5*tkin[i, j]*eb[j] for j in range(L)])
-    sint = qib.operator.FieldOperatorTerm([qib.operator.IFODesc(field, qib.operator.IFOType.FERMI_CREATE),
-                                           qib.operator.IFODesc(field, qib.operator.IFOType.FERMI_ANNIHIL),
-                                           qib.operator.IFODesc(field, qib.operator.IFOType.FERMI_ANNIHIL)],
-                                          [[[0.5*(vint[i, j, l, k] - vint[j, i, l, k])*eb[j]*eb[l]*eb[k] for l in range(L)] for k in range(L)] for j in range(L)])
-    return qib.operator.FieldOperator([skin, sint])
+
+    skin = [np.zeros_like(M) for M in psi]
+    for j in sites:
+        skin += apply_annihil_op(j, psi, 0.5*tkin[i, j])
+
+    sint = [np.zeros_like(M) for M in psi]
+    for j in sites:
+        for k in sites:
+            for l in sites:
+                sint += apply_create_op(j, 
+                        apply_annihil_op(k, 
+                        apply_annihil_op(l, psi, 0.5*(vint[i, j, l, k] - vint[j, i, l, k]))))
+    
+    return skin #+ sint
 
 
-def create_op(i: int, field: qib.field.Field):
+def apply_create_op(i: int, psi: Sequence[any], coeff=1):
     """
-    Fermionic creation operator at site `i` as field operator.
+    Apply fermionic creation operator to an MPS at site `i`.
     """
-    # unit vector
-    e1 = np.zeros(field.lattice.nsites)
-    e1[i] = 1
-    return qib.operator.FieldOperator(
-        [qib.operator.FieldOperatorTerm(
-            [qib.operator.IFODesc(field, qib.operator.IFOType.FERMI_CREATE)], e1)])
+    op = np.array([[0,0],[1,0]])
+    psi[i] = np.transpose(np.tensordot(psi[i], coeff*op, axes=(0, 0)), (2, 0, 1)) # TODO axes correct?
+    
+    return psi
 
-def annihil_op(i: int, field: qib.field.Field):
+def apply_annihil_op(i: int, psi: Sequence[any], coeff=1):
     """
-    Fermionic annihilation operator at site `i` as field operator.
+    Apply fermionic annihilation operator to an MPS at site `i`.
     """
-    # unit vector
-    e1 = np.zeros(field.lattice.nsites)
-    e1[i] = 1
-    return qib.operator.FieldOperator(
-        [qib.operator.FieldOperatorTerm(
-            [qib.operator.IFODesc(field, qib.operator.IFOType.FERMI_ANNIHIL)], e1)])
+    op = np.array([[0,1],[0,0]])
+    psi[i] = np.transpose(np.tensordot(psi[i], coeff*op, axes=(0, 0)), (2, 0, 1))
+    
+    return psi
 
 
-def construct_interacting_hamiltonian(regionA, regionB, field, tkin, vint):
+def apply_interacting_hamiltonian(regionA, regionB, field: qib.field.Field, tkin, vint, psi: Sequence[any]):
     """
     Contruct the interacting hamiltonian H_{AB} in Equ. (10).
     """
-    S_i = sum(create_op(i, field) @ construct_complementary_s(i, regionB, field, tkin, vint) for i in regionA)
-    S_j = sum(create_op(j, field) @ construct_complementary_s(j, regionA, field, tkin, vint) for j in regionB)
-    # TODO check equivalence to paper and necessity
-    Q_ii = sum(create_op(i, field) @ annihil_op(i, field) @ construct_complementary_q(i, i, regionB, field, vint) for i in regionA)
-    P_ij = sum(create_op(i, field) @  create_op(j, field) @ construct_complementary_p(i, j, regionB, field, vint) for i in regionA for j in regionA)
-    Q_ij = sum(create_op(i, field) @ annihil_op(j, field) @ construct_complementary_q(i, j, regionB, field, vint) for i in regionA for j in regionA)
+    # TODO how to sum???
+    S_A_psi = [np.zeros_like(M) for M in psi]
+    for i in regionA: 
+        S_A_psi += apply_create_op(i, 
+                  apply_complementary_s(i, regionB, field, tkin, vint, psi)) 
+   
+    """
+    S_A_psi = sum(apply_create_op(i, 
+                  apply_complementary_s(i, regionB, field, tkin, vint, psi)) 
+                  for i in regionA)
+    S_B_psi = sum(apply_create_op(j, 
+                  apply_complementary_s(j, regionA, field, tkin, vint, psi)) 
+                  for j in regionB)
+    P_psi = sum(apply_create_op(i,
+                   apply_create_op(j,
+                   apply_complementary_p(i, j, regionB, field, vint, psi))) 
+                   for i in regionA for j in regionA)
+    Q_psi = sum(apply_create_op(i, 
+                   apply_annihil_op(j, 
+                   apply_complementary_q(i, j, regionB, field, vint, psi))) 
+                   for i in regionA for j in regionA)
+    """
 
-    HABhalf = (S_i + S_j + P_ij + Q_ij)
+    HABhalf = S_A_psi #+ S_B_psi + P_psi + Q_psi
     
-    return HABhalf + HABhalf.adjoint() # TODO make return Molecularhamiltonian?
+    return HABhalf + HABhalf.adjoint() # TODO how???
 
-def apply_operator(op, psi, i: int):
-    None
-
-def apply_hamiltonian(H: qib.operator.MolecularHamiltonian, LA, psi):
+def apply_hamiltonian(H: qib.operator.MolecularHamiltonian, LA: int, psi: Sequence[any]):
     """
     Apply the hamiltonian H to the MPS psi as list of tensors.
     """
-    # TODO
-
     L = H.field.lattice.nsites
-
-    # iterate through all sites
-    for term in H.terms:
-        for i in range(len(term.opdesc)):
-            None
-        print(len(term.opdesc))
-        print(term.opdesc)
-        print("\n coeffs starting")
-        print(term.coeffs.shape)
-        print(term.coeffs.ndim)
-    # apply the respective operator
-    # apply_operator(op, psi, i)
 
     regionA = range(0, LA)
     regionB = range(LA, L)
 
-    # H_A Hamiltonian
-    HA = apply_part_of_hamiltonian(H, regionA, psi)
+    # apply H_A Hamiltonian
+    H_A_psi = apply_part_of_hamiltonian(H, regionA, psi)
     
-    # H_B Hamiltonian
-    HB = apply_part_of_hamiltonian(H, regionB, psi)
+    # apply H_B Hamiltonian
+    H_B_psi = apply_part_of_hamiltonian(H, regionB, psi)
     
-    # H_{AB} Hamiltonian
-    HAB = apply_interacting_hamiltonian(regionA, regionB, H.field, H.tkin, H.vint)
+    # apply H_{AB} Hamiltonian
+    H_AB_psi = apply_interacting_hamiltonian(regionA, regionB, H.field, H.tkin, H.vint, psi)
     
-    HA + HAB + HB
+    result = H_A_psi + H_AB_psi + H_B_psi # TODO how to add them, elementwise?
 
-    return psi
+    return result
+
+def mps_vdot(Alist, Blist):
+    """
+    Compute the inner product of two tensors in MPS format, with the convention that
+    the complex conjugate of the tensor represented by the first argument is used.
+
+    The i-th MPS tensor Alist[i] is expected to have dimensions (n[i], Da[i], Da[i+1]),
+    and similarly Blist[i] must have dimensions                 (n[i], Db[i], Db[i+1]),
+    with `n` the list of logical dimensions and `Da`, `Db` the lists of virtual bond dimensions.
+    """
+    d = len(Alist)
+    assert d == len(Blist)
+    R = np.tensordot(Blist[-1], Alist[-1].conj(), axes=(0, 0))
+    # consistency check of degree and dummy singleton dimensions
+    assert R.ndim == 4 and R.shape[1] == 1 and R.shape[3] == 1
+    # formally remove dummy singleton dimensions
+    R = np.reshape(R, (R.shape[0], R.shape[2]))
+    for i in reversed(range(d - 1)):
+        # contract with current A tensor
+        T = np.tensordot(Alist[i].conj(), R, axes=(2, 1))
+        # contract with current B tensor and update R
+        R = np.tensordot(Blist[i], T, axes=((0, 2), (0, 2)))
+    assert R.ndim == 2 and R.shape[0] == 1 and R.shape[1] == 1
+    return R[0, 0]
+
+def expectation_value(H: qib.operator.MolecularHamiltonian, LA: int, psi: Sequence[any]):
+    """
+    Calculate the expectation value <psi|H|psi> of a Hamiltonian and an MPS
+    by using a partition at LA analogously to the paper.
+    """
+    H_psi = apply_hamiltonian(H, LA, psi)
+    exp_val = mps_vdot(psi, H_psi)
+    
+    return exp_val

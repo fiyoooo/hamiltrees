@@ -100,40 +100,16 @@ def construct_random_MPS(L):
     The i-th MPS tensor psi[i] is expected to have dimensions (n[i], D[i], D[i+1])
     """
     # logical dimensions
-    n = [np.random.randint(1, 10) for i in range(L)]
+    n = [np.random.randint(1, 10) for i in range(L)] # TODO what
 
     # virtual bond dimensions (rather arbitrarily chosen) 
     D = [1, ] + [np.random.randint(1, 10) for i in range(L-1)] + [1, ]
     
     # random MPS matrices (the scaling factor keeps the norm of the full tensor in a reasonable range)
     np.random.seed(42)
-    psi = [0.4 * qib.util.crandn((n[i], D[i], D[i+1])) for i in range(L)]
+    psi = [0.4 * qib.util.crandn((2, D[i], D[i+1])) for i in range(L)]
     
     return psi
-
-def mps_vdot(Alist, Blist):
-    """
-    Compute the inner product of two tensors in MPS format, with the convention that
-    the complex conjugate of the tensor represented by the first argument is used.
-
-    The i-th MPS tensor Alist[i] is expected to have dimensions (n[i], Da[i], Da[i+1]),
-    and similarly Blist[i] must have dimensions                 (n[i], Db[i], Db[i+1]),
-    with `n` the list of logical dimensions and `Da`, `Db` the lists of virtual bond dimensions.
-    """
-    d = len(Alist)
-    assert d == len(Blist)
-    R = np.tensordot(Blist[-1], Alist[-1].conj(), axes=(0, 0))
-    # consistency check of degree and dummy singleton dimensions
-    assert R.ndim == 4 and R.shape[1] == 1 and R.shape[3] == 1
-    # formally remove dummy singleton dimensions
-    R = np.reshape(R, (R.shape[0], R.shape[2]))
-    for i in reversed(range(d - 1)):
-        # contract with current A tensor
-        T = np.tensordot(Alist[i].conj(), R, axes=(2, 1))
-        # contract with current B tensor and update R
-        R = np.tensordot(Blist[i], T, axes=((0, 2), (0, 2)))
-    assert R.ndim == 2 and R.shape[0] == 1 and R.shape[1] == 1
-    return R[0, 0]
 
 def mps_to_full_tensor(Alist):
     """
