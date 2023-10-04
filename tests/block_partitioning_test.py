@@ -16,8 +16,6 @@ import unittest
 import numpy as np
 import scipy.sparse.linalg as spla
 
-import qib
-
 
 class TestBlockPartitioning(unittest.TestCase):
 
