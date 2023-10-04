@@ -1,5 +1,5 @@
 """
-    Hamiltonian construction acc. to Eq. (9).
+    Hamiltonian construction acc. to Eq. (9) as FieldOperator.
 """
 
 import numpy as np
@@ -112,11 +112,31 @@ def construct_interacting_hamiltonian(regionA, regionB, field, tkin, vint):
     """
     S_i = sum(create_op(i, field) @ construct_complementary_s(i, regionB, field, tkin, vint) for i in regionA)
     S_j = sum(create_op(j, field) @ construct_complementary_s(j, regionA, field, tkin, vint) for j in regionB)
-    # TODO check equivalence to paper and necessity
-    Q_ii = sum(create_op(i, field) @ annihil_op(i, field) @ construct_complementary_q(i, i, regionB, field, vint) for i in regionA)
     P_ij = sum(create_op(i, field) @  create_op(j, field) @ construct_complementary_p(i, j, regionB, field, vint) for i in regionA for j in regionA)
     Q_ij = sum(create_op(i, field) @ annihil_op(j, field) @ construct_complementary_q(i, j, regionB, field, vint) for i in regionA for j in regionA)
 
     HABhalf = (S_i + S_j + P_ij + Q_ij)
     
     return HABhalf + HABhalf.adjoint() # TODO make return Molecularhamiltonian?
+
+
+def construct_partitioned_hamiltonian_FO(H: qib.operator.MolecularHamiltonian, LA: int):
+    """
+    Construct the partitioned molecular Hamiltonian H acc. to the paper.
+    Returns a FieldOperator.
+    """
+    L = H.field.lattice.nsites
+
+    regionA = range(0, LA)
+    regionB = range(LA, L)
+
+    # H_A Hamiltonian
+    HA = construct_part_of_hamiltonian(regionA, H.field, H.tkin, H.vint).as_field_operator()
+    
+    # H_B Hamiltonian
+    HB = construct_part_of_hamiltonian(regionB, H.field, H.tkin, H.vint).as_field_operator()
+    
+    # H_{AB} Hamiltonian
+    HAB = construct_interacting_hamiltonian(regionA, regionB, H.field, H.tkin, H.vint)
+
+    return HA + HAB + HB
