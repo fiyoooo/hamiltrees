@@ -5,11 +5,15 @@
 import hamiltrees as ham
 
 import numpy as np
+import pytenet as ptn
 import qib
 import fermitensor as ftn
 
 
 def construct_random_coefficients(L, rng):
+    """
+    Construct random coefficients within range `rng` for a molecular Hamiltonian with L sites.
+    """
     # Hamiltonian coefficients
     tkin = 0.5 * qib.util.crandn((L, L), rng)
     vint = 0.5 * qib.util.crandn((L, L, L, L), rng)
@@ -23,12 +27,13 @@ def construct_random_coefficients(L, rng):
 
 def construct_random_molecular_hamiltonian(L, rng):
     """
-    Construct a random molecular Hamiltonian in second quantization formulation,
+    Construct a random molecular Hamiltonian in second quantization formulation with L sites,
     using physicists' convention for the interaction term (note ordering of k and \ell) (dimensions (2^k,2^k)):
+    Returns a MolecularHamiltonian from qib library.
 
     .. math::
 
-        H = (c +) \sum_{i,j} h_{i,j} a^{\dagger}_i a_j 
+        H = \sum_{i,j} h_{i,j} a^{\dagger}_i a_j 
             + \\frac{1}{2} \sum_{i,j,k,\ell} v_{i,j,k,\ell} 
             a^{\dagger}_i a^{\dagger}_j a_{\ell} a_k
     """
@@ -45,7 +50,12 @@ def construct_random_molecular_hamiltonian(L, rng):
 def construct_random_partitioned_hamiltonian_FO(L, LA, rng):
     """
     Construct a random partitioned molecular Hamiltonian acc. to the paper.
-    Returns a FieldOperator.
+    Returns a FieldOperator from qib library.
+
+    Args:
+        L: number of sites
+        LA: site where the Hamiltonian will be partitioned
+        rng: range of random coefficients
     """
     H = construct_random_molecular_hamiltonian(L, rng)
     return ham.block_partitioning.construct_partitioned_hamiltonian_FO(H, LA)
@@ -53,68 +63,64 @@ def construct_random_partitioned_hamiltonian_FO(L, LA, rng):
 def construct_random_partitioned_hamiltonian_MPO(L, LA, rng):
     """
     Construct a random partitioned molecular Hamiltonian acc. to the paper as MPO.
-    Returns an MPO.
+    Returns an MPO from pytenet library.
+
+    Args:
+        L: number of sites
+        LA: site where the Hamiltonian will be partitioned
+        rng: range of random coefficients
     """
     H = construct_random_molecular_hamiltonian(L, rng)
     return ham.block_partitioning_MPO.construct_partitioned_hamiltonian_as_MPO(H, LA)
 
     
 def construct_random_fMPS(L):
+    """
+    Construct a random fermionic MPS with L tensors.
+    Returns an fMPS from fermitensor library.
+    """
     rng = np.random.default_rng()
 
     # physical and virtual bond dimensions
     d = 2 # because fermionic
-    #if parity == "even":
     De = [1] + ((L-1)*[5]) + [1]
-    # [ 1,  7,  5,  1]
     Do = [1] + ((L-1)*[4]) + [1]
-    # else:
-    #     De = [13,  7,  5,  2]
-    #     Do = [ 2, 11,  4, 13]
-
-    # number of fermionic modes (or lattice sites)
-    L = len(De) - 1
+    
     A = [ftn.fMPSTensor(0.5*ftn.crandn((d//2, De[i], De[i+1]), rng),
                         0.5*ftn.crandn((d//2, De[i], Do[i+1]), rng),
                         0.5*ftn.crandn((d//2, Do[i], De[i+1]), rng),
                         0.5*ftn.crandn((d//2, Do[i], Do[i+1]), rng)) for i in range(L)]
     
-    print(d**L)
     return ftn.fMPS(A)
 
-def construct_random_MPS(L):
+def construct_random_MPS_list(L):
     """
     Construct a random MPS as list of L matrices.
-    The i-th MPS tensor psi[i] is expected to have dimensions (n[i], D[i], D[i+1])
+    The i-th MPS tensor psi[i] is expected to have dimensions (2, D[i], D[i+1])
     """
-    # logical dimensions
-    n = [np.random.randint(1, 10) for i in range(L)] # TODO what
-
-    # virtual bond dimensions (rather arbitrarily chosen) 
-    D = [1, ] + [np.random.randint(1, 10) for i in range(L-1)] + [1, ]
+    # physical and virtual bond dimensions
+    d = 2 # because fermionic
+    D = [1] + [np.random.randint(1, 10) for i in range(L-1)] + [1]
     
     # random MPS matrices (the scaling factor keeps the norm of the full tensor in a reasonable range)
-    np.random.seed(42)
-    psi = [0.4 * qib.util.crandn((2, D[i], D[i+1])) for i in range(L)]
+    psi = [0.4 * qib.util.crandn((d, D[i], D[i+1])) for i in range(L)]
     
     return psi
 
-def mps_to_full_tensor(Alist):
+def construct_random_MPS(L):
     """
-    Construct the full tensor corresponding to the MPS tensors `Alist`.
+    Construct a random MPS with L tensors.
+    The i-th MPS tensor mps.A[i] is expected to have dimensions (2, D[i], D[i+1])
+    Returns an MPS from pytenet library
+    """
+    rng = np.random.default_rng()
 
-    The i-th MPS tensor Alist[i] is expected to have dimensions (n[i], D[i], D[i+1]),
-    with `n` the list of logical dimensions and `D` the list of virtual bond dimensions.
-    """
-    # consistency check: dummy singleton dimension
-    assert Alist[0].ndim == 3 and Alist[0].shape[1] == 1
-    # formally remove dummy singleton dimension
-    T = np.reshape(Alist[0], (Alist[0].shape[0], Alist[0].shape[2]))
-    # contract virtual bonds
-    for i in range(1, len(Alist)):
-        T = np.tensordot(T, Alist[i], axes=(-1, 1))
-    # consistency check: trailing dummy singleton dimension
-    assert T.shape[-1] == 1
-    # formally remove trailing singleton dimension
-    T = np.reshape(T, T.shape[:-1])
-    return T
+    # physical and virtual bond dimensions
+    d = 2 # because fermionic
+    D = [1] + [np.random.randint(1, 10) for i in range(L-1)] + [1]
+    
+    mps = ptn.MPS(rng.integers(-2, 3, size=d), 
+                   [rng.integers(-2, 3, size=Di) for Di in D], 
+                   fill='random', rng=rng)
+
+    return mps
