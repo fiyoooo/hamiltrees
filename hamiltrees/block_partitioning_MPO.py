@@ -31,11 +31,11 @@ def A(j: int, jsites, isites, D: int, tkin):
     right = (j+1) not in jsites
 
     if left: # if left side
-        A = np.zeros((2,2,1,D)) # row vector
+        A = np.zeros((2,2,1,D), dtype = 'complex_') # row vector
     elif right: # if right side
-        A = np.zeros((2,2,D,1)) # column vector
+        A = np.zeros((2,2,D,1), dtype = 'complex_') # column vector
     else:
-        A = np.zeros((2,2,D,D)) # first physical then virtual dimensions
+        A = np.zeros((2,2,D,D), dtype = 'complex_') # first physical then virtual dimensions
     
     A[:,:,0,0] = I
     A[:,:,-1,-1] = I
