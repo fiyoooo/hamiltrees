@@ -15,20 +15,19 @@ I = np.identity(2)
 
 # MPO for simplified Hamiltonian
 
-def A(j: int, jsites, isites, D: int, tkin):
+def A(j: int, isites, L: int, D: int, tkin):
     """
     Constructs j-th tensor for MPO of Hamiltonian: sum_{i in isites, j in jsites} t_ij * a_i^dagger * a_j.
     
     Args:
         j: 
-        jsites: range of j
         isites: range of i
         D: virtual bond dimensions
         tkin: coefficients
     """
     # check if left- or rightmost tensor created
-    left = (j-1) not in jsites
-    right = (j+1) not in jsites
+    left = j == 0
+    right = j == L-1
 
     if left: # if left side
         A = np.zeros((2,2,1,D), dtype = 'complex_') # row vector
@@ -37,14 +36,13 @@ def A(j: int, jsites, isites, D: int, tkin):
     else:
         A = np.zeros((2,2,D,D), dtype = 'complex_') # first physical then virtual dimensions
     
-    A[:,:,0,0] = I
-    A[:,:,-1,-1] = I
+    # diagonal of identity matrices
+    for i in range(min(A.shape[2], A.shape[3])):
+        A[:,:,i,i] = I
     
     for i in isites:
         if not left:
             A[:,:,i+1,0] = tkin[i,j] * ANNIHIL
-            if not right:
-                A[:,:,i+1,i+1] = I
         if not right:
             A[:,:,-1,i+1] = CREATE
 
@@ -60,7 +58,7 @@ def construct_simplified_MPO(regionA, regionB, L, tkin):
     
     MPO = ptn.MPO(qd, qD)
     for j in regionB:
-        MPO.A[j] = A(j, regionB, regionA, D, tkin)
+        MPO.A[j] = A(j, regionA, L, D, tkin)
     
     return MPO
 
