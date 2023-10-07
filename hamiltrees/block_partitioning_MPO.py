@@ -70,14 +70,24 @@ def construct_part_of_MPO(sites, L, tkin, vint):
     Construct the hamiltonian on the given sites as MPO.
     """
     # TODO
-    return None
 
-def construct_interacting_MPO(regionA, regionB, field, tkin, vint):
+    qd = np.zeros(2) # physical quantum numbers at each site (same for all sites)
+    # identity MPO as placeholder
+    mpo = ptn.MPO.identity(qd, L)
+
+    return mpo
+
+def construct_interacting_MPO(regionA, regionB, L, tkin, vint):
     """
     Construct the interacting hamiltonian H_{AB} in Equ. (10) as MPO.
     """
     # TODO
-    return None
+
+    qd = np.zeros(2) # physical quantum numbers at each site (same for all sites)
+    # identity MPO as placeholder
+    mpo = ptn.MPO.identity(qd, L)
+
+    return mpo
 
 def construct_partitioned_hamiltonian_as_MPO(H: qib.operator.MolecularHamiltonian, LA: int):
     """
