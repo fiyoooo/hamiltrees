@@ -26,18 +26,20 @@ class TestExpectationValue(unittest.TestCase):
         rng = np.random.default_rng(142)
         
         # random Hamiltonian
-        H = ham.random_construction.construct_random_partitioned_hamiltonian_MPO(L, LA, rng).as_matrix()
-        self.assertAlmostEqual(np.linalg.norm(H - H.conj().T), 0)
+        H = ham.random_construction.construct_random_partitioned_hamiltonian_MPO(L, LA, rng)
+        
+        # check if H hermitian
+        H_matrix = H.as_matrix()
+        self.assertAlmostEqual(np.linalg.norm(H_matrix - H_matrix.conj().T), 0)
 
         # constructing mps
-        mps = ham.random_construction.construct_random_MPS(L).as_vector()
+        mps = ham.random_construction.construct_random_MPS(L)
         
-        # check if right shapes to multiply
-        self.assertAlmostEqual(H.shape[0], mps.shape[0])
-        self.assertAlmostEqual(H.shape[1], mps.shape[0])
-                
+        # check if right shapes to contract
+        self.assertAlmostEqual(H.nsites, mps.nsites)
+               
         # calculating <mps|H|mps>
-        exp_val = np.vdot(mps, H @ mps) # TODO use ptn.vdot() for vdot of MPS class
+        exp_val = ptn.operator_average(mps, H)
         self.assertAlmostEqual(exp_val, np.real(exp_val)) # expectation value should be real
 
     def test_with_simplified_MPO(self):
