@@ -93,20 +93,6 @@ def construct_random_fMPS(L):
     
     return ftn.fMPS(A)
 
-def construct_random_MPS_list(L):
-    """
-    Construct a random MPS as list of L matrices.
-    The i-th MPS tensor psi[i] is expected to have dimensions (2, D[i], D[i+1])
-    """
-    # physical and virtual bond dimensions
-    d = 2 # because fermionic
-    D = [1] + [np.random.randint(1, 10) for i in range(L-1)] + [1]
-    
-    # random MPS matrices (the scaling factor keeps the norm of the full tensor in a reasonable range)
-    psi = [0.4 * qib.util.crandn((d, D[i], D[i+1])) for i in range(L)]
-    
-    return psi
-
 def construct_random_MPS(L):
     """
     Construct a random MPS with L tensors.
