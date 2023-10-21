@@ -13,8 +13,8 @@ import hamiltrees as ham
 
 import unittest
 import numpy as np
-
 import pytenet as ptn
+
 
 class TestExpectationValue(unittest.TestCase):
 
@@ -22,11 +22,11 @@ class TestExpectationValue(unittest.TestCase):
     def test_with_partitioned_MPO(self):
 
         L = 5
-        LA = 2
+        x = 2
         rng = np.random.default_rng(142)
         
         # random Hamiltonian
-        H = ham.random_construction.construct_random_partitioned_hamiltonian_MPO(L, LA, rng)
+        H = ham.random_construction.construct_random_partitioned_hamiltonian_MPO(L, x, rng)
         
         # check if H hermitian
         H_matrix = H.as_matrix()
@@ -45,9 +45,9 @@ class TestExpectationValue(unittest.TestCase):
     def test_with_simplified_MPO(self):
 
         L = 5
-        LA = 2
-        regionA = range(0, LA)
-        regionB = range(LA, L)
+        x = 2
+        regionA = range(0, x)
+        regionB = range(x, L)
         rng = np.random.default_rng(142)
         
         # random Hamiltonian

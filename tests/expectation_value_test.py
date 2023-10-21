@@ -21,11 +21,11 @@ class TestExpectationValue(unittest.TestCase):
     def test_with_partitioned(self):
 
         L = 5
-        LA = 2
+        x = 2
         rng = np.random.default_rng(142)
         
         # random Hamiltonian
-        H = ham.random_construction.construct_random_partitioned_hamiltonian_FO(L, LA, rng).as_matrix()
+        H = ham.random_construction.construct_random_partitioned_hamiltonian_FO(L, x, rng).as_matrix()
         self.assertAlmostEqual(spla.norm(H - H.conj().T), 0)
 
         # constructing psi

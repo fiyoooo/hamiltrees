@@ -33,9 +33,9 @@ class TestBlockPartitioning(unittest.TestCase):
         self.assertAlmostEqual(spla.norm(H - H.conj().T), 0)
 
         # sizes of regions A and B
-        LA = 2
-        regionA = range(0, LA)
-        regionB = range(LA, L)
+        x = 2
+        regionA = range(0, x)
+        regionB = range(x, L)
 
         # H_A Hamiltonian
         HA = ham.block_partitioning.construct_part_of_hamiltonian(regionA, field, tkin, vint).as_matrix()
