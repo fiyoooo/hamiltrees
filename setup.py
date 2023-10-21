@@ -10,6 +10,7 @@ setup(
     url="https://github.com/fiyoooo/hamiltrees",
     install_requires=[
         "numpy",
+        "pytenet",
         "qib",
     ],
 )
