@@ -1,7 +1,7 @@
-Fermionic Tree Tensor Networks
+Fermionic Matrix Product States
 ===============================
 
-Fermionic Hamiltonian Construction for Tree Tensor Network Architectures.
+Fermionic Hamiltonian Construction for Matrix Product State Architectures.
 
 Installation
 ------------
