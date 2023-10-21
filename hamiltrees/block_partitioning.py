@@ -1,5 +1,13 @@
 """
-    Hamiltonian construction acc. to Eq. (9) as FieldOperator.
+Partitioning of a molecular Hamiltonian in second quantization representation
+into two regions A and B as FieldOperator.
+    
+References:
+  - Naoki Nakatani and Garnet Kin-Lic Chan:
+    Efficient tree tensor network states (TTNS) for quantum chemistry:
+    Generalizations of the density matrix renormalization group algorithm
+    J. Chem. Phys. 138, 134113 (2013)
+    http://dx.doi.org/10.1063/1.4798639
 """
 
 import numpy as np
@@ -30,7 +38,7 @@ def construct_part_of_hamiltonian(sites, field: qib.field.Field, tkin, vint):
 
 def construct_complementary_p(i: int, j: int, sites, field: qib.field.Field, vint):
     """
-    Construct the complementary operator `P_{ij}^B` in Eq. (11).
+    Construct the complementary operator `P_{ij}^B` in Eq. (6) of the documentation.
     """
     L = field.lattice.nsites
     vint = np.asarray(vint)
@@ -43,11 +51,11 @@ def construct_complementary_p(i: int, j: int, sites, field: qib.field.Field, vin
         qib.operator.FieldOperatorTerm(
             [qib.operator.IFODesc(field, qib.operator.IFOType.FERMI_ANNIHIL),
              qib.operator.IFODesc(field, qib.operator.IFOType.FERMI_ANNIHIL)],
-            [[0.5*vint[i, j, l, k]*eb[l]*eb[k] for l in range(L)] for k in range(L)])])
+            [[0.5*vint[i, j, l, k]*eb[k]*eb[l] for l in range(L)] for k in range(L)])])
 
 def construct_complementary_q(i: int, j: int, sites, field: qib.field.Field, vint):
     """
-    Construct the complementary operator `Q_{ij}^B` in Eq. (12).
+    Construct the complementary operator `Q_{ij}^B` in Eq. (7) of the documentation.
     """
     L = field.lattice.nsites
     vint = np.asarray(vint)
@@ -60,11 +68,11 @@ def construct_complementary_q(i: int, j: int, sites, field: qib.field.Field, vin
         qib.operator.FieldOperatorTerm(
             [qib.operator.IFODesc(field, qib.operator.IFOType.FERMI_CREATE),
              qib.operator.IFODesc(field, qib.operator.IFOType.FERMI_ANNIHIL)],
-            [[0.5*((vint[i, k, j, l] + vint[k, i, l, j])/2 - vint[i, k, l, j])*eb[l]*eb[k] for l in range(L)] for k in range(L)])])
+            [[0.5*(vint[i, k, j, l] - vint[i, k, l, j])*eb[k]*eb[l] for l in range(L)] for k in range(L)])])
 
 def construct_complementary_s(i: int, sites, field: qib.field.Field, tkin, vint):
     """
-    Construct the complementary operator `S_i^B` in Eq. (13).
+    Construct the complementary operator `S_i^B` in Eq. (8) of the documentation.
     """
     L = field.lattice.nsites
     tkin = np.asarray(tkin)
@@ -75,11 +83,14 @@ def construct_complementary_s(i: int, sites, field: qib.field.Field, tkin, vint)
     eb = np.zeros(L)
     for k in sites:
         eb[k] = 1
-    skin = qib.operator.FieldOperatorTerm([qib.operator.IFODesc(field, qib.operator.IFOType.FERMI_ANNIHIL)], [0.5*tkin[i, j]*eb[j] for j in range(L)])
-    sint = qib.operator.FieldOperatorTerm([qib.operator.IFODesc(field, qib.operator.IFOType.FERMI_CREATE),
-                                           qib.operator.IFODesc(field, qib.operator.IFOType.FERMI_ANNIHIL),
-                                           qib.operator.IFODesc(field, qib.operator.IFOType.FERMI_ANNIHIL)],
-                                          [[[0.5*(vint[i, j, l, k] - vint[j, i, l, k])*eb[j]*eb[l]*eb[k] for l in range(L)] for k in range(L)] for j in range(L)])
+    skin = qib.operator.FieldOperatorTerm(
+            [qib.operator.IFODesc(field, qib.operator.IFOType.FERMI_ANNIHIL)], 
+            [0.5*tkin[i, j]*eb[j] for j in range(L)])
+    sint = qib.operator.FieldOperatorTerm(
+            [qib.operator.IFODesc(field, qib.operator.IFOType.FERMI_CREATE),
+            qib.operator.IFODesc(field, qib.operator.IFOType.FERMI_ANNIHIL),
+            qib.operator.IFODesc(field, qib.operator.IFOType.FERMI_ANNIHIL)],
+            [[[0.5*(vint[i, j, l, k] - vint[j, i, l, k])*eb[j]*eb[k]*eb[l] for l in range(L)] for k in range(L)] for j in range(L)])
     return qib.operator.FieldOperator([skin, sint])
 
 
@@ -108,7 +119,7 @@ def annihil_op(i: int, field: qib.field.Field):
 
 def construct_interacting_hamiltonian(regionA, regionB, field, tkin, vint):
     """
-    Contruct the interacting hamiltonian H_{AB} in Equ. (10).
+    Contruct the interacting hamiltonian H_{AB} in Equ. (5) of the documentation.
     """
     S_i = sum(create_op(i, field) @ construct_complementary_s(i, regionB, field, tkin, vint) for i in regionA)
     S_j = sum(create_op(j, field) @ construct_complementary_s(j, regionA, field, tkin, vint) for j in regionB)
@@ -117,18 +128,18 @@ def construct_interacting_hamiltonian(regionA, regionB, field, tkin, vint):
 
     HABhalf = (S_i + S_j + P_ij + Q_ij)
     
-    return HABhalf + HABhalf.adjoint() # TODO make return Molecularhamiltonian?
+    return HABhalf + HABhalf.adjoint()
 
 
-def construct_partitioned_hamiltonian_FO(H: qib.operator.MolecularHamiltonian, LA: int):
+def construct_partitioned_hamiltonian_FO(H: qib.operator.MolecularHamiltonian, x: int):
     """
-    Construct the partitioned molecular Hamiltonian H acc. to the paper.
+    Construct the partitioned molecular Hamiltonian H.
     Returns a FieldOperator.
     """
     L = H.field.lattice.nsites
 
-    regionA = range(0, LA)
-    regionB = range(LA, L)
+    regionA = range(0, x)
+    regionB = range(x, L)
 
     # H_A Hamiltonian
     HA = construct_part_of_hamiltonian(regionA, H.field, H.tkin, H.vint).as_field_operator()

@@ -1,5 +1,6 @@
 """
-    Hamiltonian construction acc. to Eq. (9) as MPO.
+Partitioning of a molecular Hamiltonian in second quantization representation
+into two regions A and B as MPO
 """
 
 import numpy as np
@@ -89,14 +90,14 @@ def construct_interacting_MPO(regionA, regionB, L, tkin, vint):
 
     return mpo
 
-def construct_partitioned_hamiltonian_as_MPO(H: qib.operator.MolecularHamiltonian, LA: int):
+def construct_partitioned_hamiltonian_as_MPO(H: qib.operator.MolecularHamiltonian, x: int):
     """
     Construct the partitioned molecular Hamiltonian H as an MPO.
     """
     L = H.field.lattice.nsites
 
-    regionA = range(0, LA)
-    regionB = range(LA, L)
+    regionA = range(0, x)
+    regionB = range(x, L)
 
     # construct H_A Hamiltonian
     MPO_A = construct_part_of_MPO(regionA, L, H.tkin, H.vint)

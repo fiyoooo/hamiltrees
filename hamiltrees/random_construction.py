@@ -1,5 +1,5 @@
 """
-    Construction of random Hamiltonians and tensors.
+Construction of random Hamiltonians and MPS.
 """
 
 import hamiltrees as ham
@@ -47,31 +47,31 @@ def construct_random_molecular_hamiltonian(L, rng):
     H = qib.operator.MolecularHamiltonian(field, 0., tkin, vint, qib.operator.MolecularHamiltonianSymmetry.HERMITIAN | qib.operator.MolecularHamiltonianSymmetry.VARCHANGE)
     return H
 
-def construct_random_partitioned_hamiltonian_FO(L, LA, rng):
+def construct_random_partitioned_hamiltonian_FO(L, x, rng):
     """
     Construct a random partitioned molecular Hamiltonian acc. to the paper.
     Returns a FieldOperator from qib library.
 
     Args:
         L: number of sites
-        LA: site where the Hamiltonian will be partitioned
+        x: site where the Hamiltonian will be partitioned
         rng: range of random coefficients
     """
     H = construct_random_molecular_hamiltonian(L, rng)
-    return ham.block_partitioning.construct_partitioned_hamiltonian_FO(H, LA)
+    return ham.block_partitioning.construct_partitioned_hamiltonian_FO(H, x)
     
-def construct_random_partitioned_hamiltonian_MPO(L, LA, rng):
+def construct_random_partitioned_hamiltonian_MPO(L, x, rng):
     """
     Construct a random partitioned molecular Hamiltonian acc. to the paper as MPO.
     Returns an MPO from pytenet library.
 
     Args:
         L: number of sites
-        LA: site where the Hamiltonian will be partitioned
+        x: site where the Hamiltonian will be partitioned
         rng: range of random coefficients
     """
     H = construct_random_molecular_hamiltonian(L, rng)
-    return ham.block_partitioning_MPO.construct_partitioned_hamiltonian_as_MPO(H, LA)
+    return ham.block_partitioning_MPO.construct_partitioned_hamiltonian_as_MPO(H, x)
 
     
 def construct_random_fMPS(L):
